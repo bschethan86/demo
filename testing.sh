@@ -240,3 +240,138 @@ HMVtgYu610Zh+/170aMFe55K6Nse3+xYQIergKujEjEEZls8gNemMtudpHurZLGYQ+vadVn19D3q1RSt
 /datapowerlogs/ReplacementXI52toIDG/SecureBackupFiles 
 
 curl -X GET "https://savamar3/api/v1/clients?domain=%2FNDMP&recursive=false" -H "accept: application/json" -H "authorization: Bearer  <keys>"
+
+
+
+stage('Checkout external proj') {
+        steps {
+            git branch: 'webhook',
+                credentialsId: '729b7ff2-6540-4ed9-a1fa-54ca03dfeaf8',
+                url: 'ssh://git@vmlnxatlstash.lowes.com:42000/e-unc/chethan.git'
+
+            sh "ls -lat"
+        }
+    }
+	
+def checkout_from_reference(commit) {
+    def reponame = 'webhook'
+    def repo_url = "ssh://git@vmlnxatlstash.lowes.com:42000/e-unc/chethan.git"
+ 
+    echo "Checkout SHA from reference $commit"
+    checkout([
+        $class: 'GitSCM',
+        branches: [[name: commit]],
+        doGenerateSubmoduleConfigurations: false,
+        extensions: [
+            [$class: 'RelativeTargetDirectory', relativeTargetDir: reponame],
+            [$class: 'CloneOption', reference: "/opt/${reponame}"]
+        ],
+        submoduleCfg: [],
+        userRemoteConfigs: [
+            [credentialsId: '729b7ff2-6540-4ed9-a1fa-54ca03dfeaf8', url: repo_url]
+        ]
+    ])
+    // just to show we are in the right commit:
+    dir(reponame) {
+        sh(script: "ls -lat")
+    }
+}	
+
+
+
+#!/bin/groovy
+
+
+pipeline {
+    agent { label 'master' }    
+
+    define {
+       def my_map = [:] //empty map
+       def my_list //undefined shared variable
+     }
+
+    stages {
+        stage('stage1') {
+          steps {
+            script {
+              //If def can be anywhere in pipeline {}, drop script {}
+              my_list = [1,2,3]
+            }
+          }
+        }
+    
+        stage('stage2') {
+          steps {
+            script {
+                for(int i=0; i<my_list.size();i++) {
+                    echo "Doing something with ${my_list[i]}"
+                }
+            }
+          }
+        }
+    }
+}
+
+def foo = "foo"
+
+pipeline {
+    agent none
+    stages {
+        stage("first") {
+            sh "echo ${foo}"
+        }
+    }
+}
+
+
+#!groovy
+
+node {
+     stage("Git changes") {
+          def folderpath = sh(script: "git whatchanged origin/master -n 1|tail -n 1|cut -d / -f1|awk '{print \$NF}'", returnStdout: true)
+		  println folderpath
+     }
+        }
+
+pipeline {
+  agent { label 'master' }
+stages {
+			   
+             stage('Terraform Plan') {
+                   steps {
+                sh 'echo ${folderpath};pwd'
+                                 }
+                      }
+                stage('Waiting for Approval') {
+                  steps {
+        script {
+          def userInput = input(id: 'confirm', message: 'Apply Terraform?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Apply terraform', name: 'confirm'] ])
+        }
+      }
+    }
+
+                stage('Terraform Apply') {
+                    steps {
+                sh 'echo ${folderpath}'
+                       }
+                  }
+}
+  
+  post {
+        always {
+            echo 'Terraform code run & initiated a build!'
+            
+            emailext body: "${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.BUILD_NUMBER}\n More info at: ${env.BUILD_URL}",
+                recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']],
+                subject: "Jenkins Build ${currentBuild.currentResult}: Job ${env.JOB_NAME}" , to: 'chethan.bs01@lowes.com'
+
+          }
+
+  }
+  
+}
+
+
+	
+	
+	
