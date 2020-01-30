@@ -1,0 +1,10 @@
+- name: test palybook
+  hosts: all
+
+  tasks:
+  - name: run
+    shell: whoami;hostname;pwd
+    register: out
+
+  - debug:
+      var: out
